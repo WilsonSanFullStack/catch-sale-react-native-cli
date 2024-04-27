@@ -28,7 +28,10 @@ build/
 .idea
 .gradle
 local.properties
-.gradle.properties
+# Ignora el archivo gradle.properties
+android/gradle.properties
+
+gradle.properties
 *.iml
 *.hprof
 .cxx/
