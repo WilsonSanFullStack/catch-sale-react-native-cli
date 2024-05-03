@@ -5,9 +5,8 @@
  * @format
  */
 
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Alert} from 'react-native';
-
 import {
   SafeAreaView,
   ScrollView,
@@ -19,6 +18,7 @@ import {
   Button,
   Clipboard,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Producto {
   codigo: number;
@@ -26,10 +26,17 @@ interface Producto {
   cantidad: number;
   subTotal: number;
 }
+interface Product {
+  codigo: number;
+  precio: number;
+  descripcion: string;
+  cantidad: number;
+}
 
 function App(): React.JSX.Element {
   const [codigo, SetCodigo] = useState<string>('');
   const [precio, SetPrecio] = useState<string>('');
+  const [descripcion, SetDescripcion] = useState<string>('');
   const [cantidad, SetCantidad] = useState<string>('');
   const [factura, setFactura] = useState<Producto[]>([]);
 
@@ -46,8 +53,10 @@ function App(): React.JSX.Element {
       SetCantidad('');
       SetPrecio('');
     } else {
-      Alert.alert('Faltan datos',
-      'Por favor completa la información antes de agregar el producto.',);
+      Alert.alert(
+        'Faltan datos',
+        'Por favor completa la información antes de agregar el producto.',
+      );
     }
   };
   const handleDelete = (productId: number) => {
@@ -76,138 +85,167 @@ function App(): React.JSX.Element {
     const formatFactura = () => {
       const formattedFactura = `Cliente: ${cliente},\nVendedor: ${vendedor},\n\n${factura
         .map(
-          producto =>`Producto: ${producto.codigo}, precio: ${producto.precio},  cantidad: ${producto.cantidad},  subTotal: ${producto.subTotal}, `,).join('\n\n')}\n\ntotal: ${total}`;
+          producto =>
+            `Producto: ${producto.codigo}, precio: ${producto.precio},  cantidad: ${producto.cantidad},  subTotal: ${producto.subTotal}, `,
+        )
+        .join('\n\n')}\n\ntotal: ${total}`;
       return formattedFactura;
     };
 
     const formattedFactura = formatFactura();
     Clipboard.setString(formattedFactura);
     Alert.alert('Factura copiada', 'La factura se ha copiado al portapapeles.');
-    setFactura([])
-    setCliente('')
+    setFactura([]);
+    setCliente('');
+  };
+
+  useEffect(() => {
+    cargarProducto();
+  }, [codigo]);
+
+  const cargarProducto = async () => {
+    try {
+      const jsonStr = await AsyncStorage.getItem(
+        'file:///storage/emulated/0/Download/db.json',
+      );
+      const producto: Product[] = jsonStr ? JSON.parse(jsonStr) : [];
+      const productoEncontrado = producto.find(
+        producto => producto.codigo.toString() === codigo,
+      );
+      if (productoEncontrado) {
+        SetDescripcion(productoEncontrado.descripcion);
+        SetPrecio(productoEncontrado.precio.toString())
+      }
+    } catch (error) {
+      Alert.alert('Error al cargar el archivo JSON:', ' ' + error)
+    }
   };
   return (
     <SafeAreaView style={styles.container}>
       {/* <StatusBar /> */}
-      <Text style={styles.text}>Catch Sale</Text>
-      <View style={{justifyContent: 'space-between'}}>
-        <Text style={styles.producto}>Producto</Text>
-        <View style={styles.view}>
-          <Text style={styles.label}>Codigo:</Text>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="codico del articulo"
-            style={styles.input}
-            value={codigo}
-            onChangeText={text => SetCodigo(text)}
-          />
-        </View>
+      <ScrollView>
+        <Text style={styles.text}>Catch Sale</Text>
+        <View style={{justifyContent: 'space-between'}}>
+          <Text style={styles.producto}>Producto</Text>
+          <View style={styles.view}>
+            <Text style={styles.label}>Codigo:</Text>
+            <TextInput
+              keyboardType="numeric"
+              placeholder="codico del articulo"
+              style={styles.input}
+              value={codigo}
+              onChangeText={text => SetCodigo(text)}
+            />
+          </View>
 
-        <View style={styles.view}>
-          <Text style={styles.label}>Precio:</Text>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="precio del articulo"
-            style={styles.input}
-            value={precio}
-            onChangeText={text => SetPrecio(text)}
-          />
+          <View style={styles.view}>
+            <Text style={styles.label}>Precio:</Text>
+            <Text
+              style={styles.input}
+            >{precio}</Text>
+          </View>
+          <View style={styles.view}>
+            <Text style={styles.label}>Descripcion:</Text>
+            <Text
+              style={styles.input}
+            >{descripcion}</Text>
+          </View>
+          <View style={styles.view}>
+            <Text style={styles.label}>Cantidad:</Text>
+            <TextInput
+              keyboardType="numeric"
+              placeholder="cantidad del articulo"
+              style={styles.input}
+              value={cantidad}
+              onChangeText={text => SetCantidad(text)}
+            />
+          </View>
         </View>
-        <View style={styles.view}>
-          <Text style={styles.label}>Cantidad:</Text>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="cantidad del articulo"
-            style={styles.input}
-            value={cantidad}
-            onChangeText={text => SetCantidad(text)}
-          />
+        <View>
+          <Button title="agregar" onPress={handleFactura}></Button>
         </View>
-      </View>
-      <View>
-        <Button title="agregar" onPress={handleFactura}></Button>
-      </View>
-      <View style={styles.stickyHeader}>
-        <Text style={styles.encabezado}>##</Text>
-        <Text style={styles.encabezado}>codigo</Text>
-        <Text style={styles.encabezado}>precio</Text>
-        <Text style={styles.encabezado}>cantidad</Text>
-        <Text style={styles.encabezado}>subTotal</Text>
-        <Text style={styles.encabezado}>eliminar</Text>
-      </View>
-      <ScrollView
-        style={{
-          borderColor: 'white',
-          borderWidth: 2,
-          width: '99%',
-          marginLeft: 2,
-        }}>
-        {factura?.map((producto, index) => {
-          return (
-            <View style={styles.table} key={index + 1}>
-              <Text style={styles.fila}>{index + 1}</Text>
-              <Text style={styles.fila}>{producto.codigo}</Text>
-              <Text style={styles.fila}>
-                {producto.precio.toLocaleString('es-ES', {
-                  maximumFractionDigits: 2,
-                })}
-              </Text>
-              <Text style={styles.fila}>
-                {producto.cantidad.toLocaleString('es-ES', {
-                  maximumFractionDigits: 2,
-                })}
-              </Text>
-              <Text style={styles.fila}>
-                {producto.subTotal.toLocaleString('es-ES', {
-                  maximumFractionDigits: 2,
-                })}
-              </Text>
-              <View>
-                <Button
-                  title="eliminar"
-                  onPress={() => handleDelete(producto.codigo)}></Button>
+        <View style={styles.stickyHeader}>
+          <Text style={styles.encabezado}>##</Text>
+          <Text style={styles.encabezado}>codigo</Text>
+          <Text style={styles.encabezado}>precio</Text>
+          <Text style={styles.encabezado}>cantidad</Text>
+          <Text style={styles.encabezado}>subTotal</Text>
+          <Text style={styles.encabezado}>eliminar</Text>
+        </View>
+        <ScrollView
+          style={{
+            borderColor: 'white',
+            borderWidth: 2,
+            width: '99%',
+            marginLeft: 2,
+          }}>
+          {factura?.map((producto, index) => {
+            return (
+              <View style={styles.table} key={index + 1}>
+                <Text style={styles.fila}>{index + 1}</Text>
+                <Text style={styles.fila}>{producto.codigo}</Text>
+                <Text style={styles.fila}>
+                  {producto.precio.toLocaleString('es-ES', {
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+                <Text style={styles.fila}>
+                  {producto.cantidad.toLocaleString('es-ES', {
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+                <Text style={styles.fila}>
+                  {producto.subTotal.toLocaleString('es-ES', {
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+                <View>
+                  <Button
+                    title="eliminar"
+                    onPress={() => handleDelete(producto.codigo)}></Button>
+                </View>
               </View>
-            </View>
-          );
-        })}
-        <View style={styles.table}>
-          <Text style={styles.fila}></Text>
-          <Text style={styles.fila}></Text>
-          <Text style={styles.fila}></Text>
-          <Text style={styles.fila}></Text>
-          <Text style={styles.fila}>Total:</Text>
-          <Text style={styles.fila}>
-            {total.toLocaleString('es-ES', {
-              maximumFractionDigits: 2,
-            })}
-          </Text>
+            );
+          })}
+          <View style={styles.table}>
+            <Text style={styles.fila}></Text>
+            <Text style={styles.fila}></Text>
+            <Text style={styles.fila}></Text>
+            <Text style={styles.fila}></Text>
+            <Text style={styles.fila}>Total:</Text>
+            <Text style={styles.fila}>
+              {total.toLocaleString('es-ES', {
+                maximumFractionDigits: 2,
+              })}
+            </Text>
+          </View>
+        </ScrollView>
+        <View style={{marginTop: 10}}>
+          <View style={styles.view}>
+            <Text style={styles.label}>Cliente:</Text>
+            <TextInput
+              keyboardType="numeric"
+              placeholder="codico del cliente"
+              style={styles.input}
+              value={cliente}
+              onChangeText={text => setCliente(text)}
+            />
+          </View>
+          <View style={styles.view}>
+            <Text style={styles.label}>Vendedor:</Text>
+            <TextInput
+              keyboardType="numeric"
+              placeholder="codico del vendedor"
+              style={styles.input}
+              value={vendedor}
+              onChangeText={text => setVendedor(text)}
+            />
+          </View>
+        </View>
+        <View>
+          <Button title="Guardar" onPress={copyFacturaToClipboard}></Button>
         </View>
       </ScrollView>
-      <View style={{marginTop: 10}}>
-        <View style={styles.view}>
-          <Text style={styles.label}>Cliente:</Text>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="codico del cliente"
-            style={styles.input}
-            value={cliente}
-            onChangeText={text => setCliente(text)}
-          />
-        </View>
-        <View style={styles.view}>
-          <Text style={styles.label}>Vendedor:</Text>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="codico del vendedor"
-            style={styles.input}
-            value={vendedor}
-            onChangeText={text => setVendedor(text)}
-          />
-        </View>
-      </View>
-      <View>
-        <Button title="Guardar" onPress={copyFacturaToClipboard}></Button>
-      </View>
     </SafeAreaView>
   );
 }
@@ -298,7 +336,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontStyle: 'italic',
     fontWeight: 'bold',
-    paddingRight: 4
+    paddingRight: 4,
   },
 });
 
